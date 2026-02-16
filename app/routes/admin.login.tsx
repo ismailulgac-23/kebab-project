@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { Icon } from "@iconify/react";
 import cn from "classnames";
 import { prisma } from "~/lib/prisma";
-import bcrypt from "bcryptjs";
+import * as bcrypt from "bcryptjs";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
     // Session logic could be added here
