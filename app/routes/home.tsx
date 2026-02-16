@@ -10,7 +10,7 @@ import "swiper/css/free-mode";
 import Input from "~/components/Input";
 import { Icon } from "@iconify/react";
 
-export function meta({}: Route.MetaArgs) {
+export function meta({ }: Route.MetaArgs) {
   return [
     { title: "Kebs Baba | Home" },
     { name: "description", content: "Kebs Baba | Home" },
@@ -873,7 +873,7 @@ const WhoIsTheFuckingBaba = () => {
         <p className="text-primary mb-4 text-lg font-frankfurter">
           C’est le rituel des dimanches midi en famille (ou en gueule de bois).
           C’est la valeur sure, celle qui remplit bien l’bide, celle qui
-          réchauffe et qui rassemble ! 
+          réchauffe et qui rassemble !
         </p>
 
         <p className="text-primary mb-4 text-lg font-frankfurter">
@@ -881,17 +881,17 @@ const WhoIsTheFuckingBaba = () => {
           tout le monde l’attendait au tournant. Deux ans plus tard, Baba s’est
           imposé dans le coeur de Alsaciens, avec ses kebs maisons, frais et
           gourmands, inspirées des voyages aventures de Baba entre l’Allemagne
-          et la Turquie. 
+          et la Turquie.
         </p>
         <p className="text-primary mb-4 text-lg font-frankfurter">
           Mais alors qu’on pensait tout savoir sur Baba, on raconte depuis peu
           qu’il viverait une double vie, et que le boug serait aussi un fou de
-          Disco. 
+          Disco.
         </p>
         <p className="text-primary mb-4 text-lg font-frankfurter">
           On raconte que certains soirs, dans sa deuxième maison, à la Krutenau,
           Baba organise des soirées Disco jusqu’à l’aube, et qu’il aurait même
-          une broche à facettes… 
+          une broche à facettes…
         </p>
         <p className="text-primary mb-4 text-lg font-frankfurter">
           Mais ça, il faut le voir pour le croire.

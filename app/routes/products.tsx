@@ -1,42 +1,35 @@
-import { Link } from "react-router";
-import type { Route } from "./+types/home";
+import { Link, useLoaderData } from "react-router";
 import cn from "classnames";
 import { motion } from "framer-motion";
-import { Swiper, SwiperSlide } from "swiper/react";
-import { Autoplay, Navigation, FreeMode } from "swiper/modules";
-import "swiper/css";
-import "swiper/css/navigation";
-import "swiper/css/free-mode";
-import Input from "~/components/Input";
+import { useState, useEffect } from "react";
 import { Icon } from "@iconify/react";
-import { Footer, Marquee, Topbar } from "./home";
-import { useState, useRef, useEffect } from "react";
+import { prisma } from "~/lib/prisma";
+import { Topbar, Footer, Marquee } from "./home";
 
-export function meta({}: Route.MetaArgs) {
-  return [
-    { title: "Kebs Baba | Products" },
-    { name: "description", content: "Kebs Baba | Products" },
-  ];
-}
+export const loader = async () => {
+  const products = await prisma.product.findMany({
+    include: { category: true }
+  });
+  const categories = await prisma.category.findMany();
+  return { products, categories };
+};
 
-// Fake ürün verileri
-const mockProducts = [
-  { id: 1, name: "Tee-shirt Baba", price: "25,00€", category: "tshirt", size: "M", color: "noir", image: "/assets/images/t-shirt.png" },
-  { id: 2, name: "Hoodie Kebs", price: "45,00€", category: "hoodie", size: "L", color: "rouge", image: "/assets/images/t-shirt.png" },
-  { id: 3, name: "Casquette Baba", price: "20,00€", category: "accessoire", size: "unique", color: "noir", image: "/assets/images/t-shirt.png" },
-  { id: 4, name: "Tee-shirt Vintage", price: "30,00€", category: "tshirt", size: "S", color: "blanc", image: "/assets/images/t-shirt.png" },
-  { id: 5, name: "Sweat Kebs", price: "40,00€", category: "hoodie", size: "XL", color: "rouge", image: "/assets/images/t-shirt.png" },
-  { id: 6, name: "Sac Baba", price: "15,00€", category: "accessoire", size: "unique", color: "noir", image: "/assets/images/t-shirt.png" },
-  { id: 7, name: "Tee-shirt Premium", price: "35,00€", category: "tshirt", size: "M", color: "blanc", image: "/assets/images/t-shirt.png" },
-  { id: 8, name: "Hoodie Limited", price: "50,00€", category: "hoodie", size: "L", color: "noir", image: "/assets/images/t-shirt.png" },
-  { id: 9, name: "Sticker Pack", price: "10,00€", category: "accessoire", size: "unique", color: "multicolor", image: "/assets/images/t-shirt.png" },
-  { id: 10, name: "Tee-shirt Collector", price: "40,00€", category: "tshirt", size: "XL", color: "rouge", image: "/assets/images/t-shirt.png" },
-  { id: 11, name: "Bonnet Baba", price: "18,00€", category: "accessoire", size: "unique", color: "noir", image: "/assets/images/t-shirt.png" },
-  { id: 12, name: "Polo Kebs", price: "32,00€", category: "tshirt", size: "L", color: "blanc", image: "/assets/images/t-shirt.png" },
-];
+export default function Products() {
+  const { products: dbProducts, categories } = useLoaderData<typeof loader>();
 
-const Products = () => {
-  const [filteredProducts, setFilteredProducts] = useState(mockProducts);
+  // Transform DB products to frontend format
+  const mappedProducts = dbProducts.map(p => ({
+    id: p.id,
+    name: p.name,
+    price: p.price,
+    category: p.category.name,
+    size: p.size || "Unique",
+    color: p.color || "N/A",
+    image: p.image || "/assets/images/t-shirt.png",
+    description: p.description
+  }));
+
+  const [filteredProducts, setFilteredProducts] = useState(mappedProducts);
   const [activeFilters, setActiveFilters] = useState({
     category: "all",
     size: "all",
@@ -44,361 +37,112 @@ const Products = () => {
     priceRange: "all"
   });
 
-  // Filtreleme fonksiyonu
+  useEffect(() => {
+    applyFilters(activeFilters);
+  }, [dbProducts]);
+
   const applyFilters = (filters: typeof activeFilters) => {
-    let filtered = mockProducts;
+    let filtered = mappedProducts;
 
     if (filters.category !== "all") {
-      filtered = filtered.filter(product => product.category === filters.category);
+      filtered = filtered.filter(p => p.category === filters.category);
     }
-
     if (filters.size !== "all") {
-      filtered = filtered.filter(product => product.size === filters.size);
+      filtered = filtered.filter(p => p.size === filters.size);
     }
-
     if (filters.color !== "all") {
-      filtered = filtered.filter(product => product.color === filters.color);
+      filtered = filtered.filter(p => p.color === filters.color);
     }
 
     if (filters.priceRange !== "all") {
       switch (filters.priceRange) {
-        case "0-20":
-          filtered = filtered.filter(product => {
-            const price = parseFloat(product.price.replace(",", ".").replace("€", ""));
-            return price <= 20;
-          });
-          break;
-        case "20-40":
-          filtered = filtered.filter(product => {
-            const price = parseFloat(product.price.replace(",", ".").replace("€", ""));
-            return price > 20 && price <= 40;
-          });
-          break;
-        case "40+":
-          filtered = filtered.filter(product => {
-            const price = parseFloat(product.price.replace(",", ".").replace("€", ""));
-            return price > 40;
-          });
-          break;
+        case "0-20": filtered = filtered.filter(p => p.price <= 20); break;
+        case "20-40": filtered = filtered.filter(p => p.price > 20 && p.price <= 40); break;
+        case "40+": filtered = filtered.filter(p => p.price > 40); break;
       }
     }
 
     setFilteredProducts(filtered);
   };
 
-  const handleFilterChange = (filterType: string, value: string) => {
-    const newFilters = { ...activeFilters, [filterType]: value };
-    setActiveFilters(newFilters);
-    applyFilters(newFilters);
+  const handleFilterChange = (key: string, value: string) => {
+    const next = { ...activeFilters, [key]: value };
+    setActiveFilters(next);
+    applyFilters(next);
   };
 
   return (
-    <div className="">
-      {/* topbar */}
+    <div className="bg-[#FEF8F7] min-h-screen">
       <Topbar />
+      <Marquee text="SHOP BABA - SHOP BABA - SHOP BABA - SHOP BABA" />
 
-      {/* marquee */}
-      <Marquee />
+      <div className="container mx-auto py-20 px-4">
+        <div className="flex flex-col md:flex-row justify-between items-end mb-12 gap-8 border-b-4 border-primary pb-8">
+          <div>
+            <h1 className="font-zipper text-7xl text-primary uppercase leading-none">Nos Merchs</h1>
+            <p className="font-frankfurter text-primary/60 mt-4 uppercase tracking-widest">
+              {filteredProducts.length} ARTICLES TROUVÉS
+            </p>
+          </div>
 
-      <IntroText />
+          <div className="flex flex-wrap gap-4">
+            <select
+              onChange={(e) => handleFilterChange("category", e.target.value)}
+              className="bg-white border-2 border-primary rounded-full px-6 py-2 font-frankfurter text-primary outline-none"
+            >
+              <option value="all">Catégories</option>
+              {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+            </select>
+            <select
+              onChange={(e) => handleFilterChange("priceRange", e.target.value)}
+              className="bg-white border-2 border-primary rounded-full px-6 py-2 font-frankfurter text-primary outline-none"
+            >
+              <option value="all">Prix</option>
+              <option value="0-20">0€ - 20€</option>
+              <option value="20-40">20€ - 40€</option>
+              <option value="40+">40€+</option>
+            </select>
+          </div>
+        </div>
 
-      <ProductList
-        products={filteredProducts}
-        onFilterChange={handleFilterChange}
-        activeFilters={activeFilters}
-      />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-12">
+          {filteredProducts.map((product, i) => (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.05 }}
+              key={product.id}
+              className="group"
+            >
+              <div className="bg-white border-4 border-primary rounded-[40px] overflow-hidden p-6 hover:shadow-2xl transition-all relative">
+                <div className="aspect-square rounded-[30px] overflow-hidden mb-6 bg-gray-50 border-2 border-primary/5">
+                  <img
+                    src={product.image}
+                    alt={product.name}
+                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                  />
+                </div>
+                <h3 className="font-zipper text-2xl text-primary uppercase truncate mb-1">{product.name}</h3>
+                <div className="flex justify-between items-center mt-4">
+                  <span className="font-zipper text-3xl text-primary">{product.price.toFixed(2)}€</span>
+                  <button className="bg-primary text-white font-zipper px-6 py-2 rounded-full uppercase text-sm hover:scale-105 transition-transform">
+                    Voir
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+
+        {filteredProducts.length === 0 && (
+          <div className="text-center py-40">
+            <Icon icon="solar:box-minimalistic-bold" className="text-8xl text-primary/10 mx-auto mb-6" />
+            <h2 className="font-zipper text-4xl text-primary uppercase">Aucun article trouvé</h2>
+          </div>
+        )}
+      </div>
 
       <Footer />
     </div>
   );
-};
-
-// Custom Dropdown Component
-const FilterDropdown = ({
-  label,
-  options,
-  value,
-  onChange,
-  filterKey
-}: {
-  label: string;
-  options: { value: string; label: string }[];
-  value: string;
-  onChange: (filterType: string, value: string) => void;
-  filterKey: string;
-}) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  const selectedOption = options.find(option => option.value === value);
-
-  return (
-    <div className="relative" ref={dropdownRef}>
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 px-4 py-2 border-2 border-primary rounded-full bg-white hover:bg-gray-50 transition-colors min-w-[120px] justify-between"
-      >
-        <span className="font-frankfurter text-primary text-sm">
-          {selectedOption?.label || label}
-        </span>
-        <Icon
-          icon="fa-solid:chevron-down"
-          className={cn(
-            "text-primary w-3 h-3 transition-transform",
-            isOpen && "rotate-180"
-          )}
-        />
-      </button>
-
-      {isOpen && (
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -10 }}
-          className="absolute top-full left-0 mt-2 w-full bg-white border-2 border-primary rounded-2xl shadow-lg z-50 overflow-hidden"
-        >
-          {options.map((option) => (
-            <button
-              key={option.value}
-              onClick={() => {
-                onChange(filterKey, option.value);
-                setIsOpen(false);
-              }}
-              className={cn(
-                "w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors font-frankfurter text-sm",
-                value === option.value ? "bg-primary text-white" : "text-primary"
-              )}
-            >
-              {option.label}
-            </button>
-          ))}
-        </motion.div>
-      )}
-    </div>
-  );
-};
-
-const ProductList = ({
-  products,
-  onFilterChange,
-  activeFilters
-}: {
-  products: typeof mockProducts;
-  onFilterChange: (filterType: string, value: string) => void;
-  activeFilters: any;
-}) => {
-  const [showFilters, setShowFilters] = useState(false);
-
-  const filterOptions = {
-    category: [
-      { value: "all", label: "Toutes catégories" },
-      { value: "tshirt", label: "T-shirts" },
-      { value: "hoodie", label: "Hoodies" },
-      { value: "accessoire", label: "Accessoires" }
-    ],
-    size: [
-      { value: "all", label: "Toutes tailles" },
-      { value: "S", label: "S" },
-      { value: "M", label: "M" },
-      { value: "L", label: "L" },
-      { value: "XL", label: "XL" },
-      { value: "unique", label: "Taille unique" }
-    ],
-    color: [
-      { value: "all", label: "Toutes couleurs" },
-      { value: "noir", label: "Noir" },
-      { value: "blanc", label: "Blanc" },
-      { value: "rouge", label: "Rouge" },
-      { value: "multicolor", label: "Multicolore" }
-    ],
-    priceRange: [
-      { value: "all", label: "Tous prix" },
-      { value: "0-20", label: "0€ - 20€" },
-      { value: "20-40", label: "20€ - 40€" },
-      { value: "40+", label: "40€+" }
-    ]
-  };
-
-  return (
-    <div className="mt-10 container mx-auto">
-      {/* Filter Header */}
-      <div className="border-b-2 border-b-primary w-full py-2 flex items-center justify-between">
-        <div className="text-sm font-frankfurter text-primary">
-          {products.length} produit{products.length > 1 ? 's' : ''} trouvé{products.length > 1 ? 's' : ''}
-        </div>
-        <button
-          onClick={() => setShowFilters(!showFilters)}
-          className="flex items-center gap-1.5"
-        >
-          <span className="text-lg font-frankfurter text-primary">Filtre</span>
-          <Icon
-            icon="fa-solid:chevron-down"
-            className={cn(
-              "text-primary w-4 h-4 transition-transform",
-              showFilters && "rotate-180"
-            )}
-          />
-        </button>
-      </div>
-
-      {/* Filter Dropdowns */}
-      {showFilters && (
-        <motion.div
-          initial={{ opacity: 0, height: 0 }}
-          animate={{ opacity: 1, height: "auto" }}
-          exit={{ opacity: 0, height: 0 }}
-          className="py-6 border-b-2 border-b-primary"
-        >
-          <div className="flex flex-wrap gap-4">
-            <FilterDropdown
-              label="Catégorie"
-              options={filterOptions.category}
-              value={activeFilters.category}
-              onChange={onFilterChange}
-              filterKey="category"
-            />
-            <FilterDropdown
-              label="Taille"
-              options={filterOptions.size}
-              value={activeFilters.size}
-              onChange={onFilterChange}
-              filterKey="size"
-            />
-            <FilterDropdown
-              label="Couleur"
-              options={filterOptions.color}
-              value={activeFilters.color}
-              onChange={onFilterChange}
-              filterKey="color"
-            />
-            <FilterDropdown
-              label="Prix"
-              options={filterOptions.priceRange}
-              value={activeFilters.priceRange}
-              onChange={onFilterChange}
-              filterKey="priceRange"
-            />
-            
-            {/* Reset Filters Button */}
-            <button
-              onClick={() => {
-                const resetFilters = { category: "all", size: "all", color: "all", priceRange: "all" };
-                Object.keys(resetFilters).forEach(key => {
-                  onFilterChange(key, resetFilters[key as keyof typeof resetFilters]);
-                });
-              }}
-              className="px-4 py-2 text-sm font-frankfurter text-primary hover:text-red-600 transition-colors"
-            >
-              Réinitialiser
-            </button>
-          </div>
-        </motion.div>
-      )}
-
-      {/* Products Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-10 w-full py-10">
-        {products.length === 0 ? (
-          <div className="col-span-full text-center py-20">
-            <p className="text-xl font-cooper text-primary">
-              Aucun produit trouvé avec ces filtres
-            </p>
-          </div>
-        ) : (
-          products.map((product) => (
-            <Link
-              to={"/products/" + product.id}
-              key={product.id}
-              className="border-2 border-primary rounded-3xl hover:shadow-lg transition-shadow"
-            >
-              <img
-                src={product.image}
-                alt={product.name}
-                className="rounded-tl-3xl rounded-tr-3xl w-full"
-              />
-
-              <div className="py-3.5 px-6">
-                <h3 className="font-cooper text-primary uppercase text-[23px]">
-                  {product.name}
-                </h3>
-                <p className="text-lg font-cooper mb-1">{product.price}</p>
-                <div className="flex gap-2 mb-2">
-                  <span className="text-xs font-cooper text-gray-600 bg-gray-100 px-2 py-1 rounded">
-                    {product.size}
-                  </span>
-                  <span className="text-xs font-cooper text-gray-600 bg-gray-100 px-2 py-1 rounded">
-                    {product.color}
-                  </span>
-                </div>
-                <p className="mb-7 text-base font-cooper text-primary">
-                  Pièce iconique du moment, le {product.name.toLowerCase()} allie confort
-                  et caractère.
-                </p>
-
-                <button className="font-zipper font-medium text-2xl uppercase flex items-center justify-center h-10 px-4 pt-2 ml-auto cursor-pointer bg-white border-2 border-primary rounded-full hover:bg-primary hover:text-white transition-colors">
-                  Ajouter au panier
-                </button>
-              </div>
-            </Link>
-          ))
-        )}
-      </div>
-    </div>
-  );
-};
-
-const IntroText = () => {
-  return (
-    <div className="container mx-auto relative">
-      <img
-        src="/assets/images/merchs-intro.png"
-        className="w-[1168px] mx-auto"
-      />
-
-      <div className="hidden md:block">
-        <img
-          src="/assets/images/ouvert.png"
-          className="w-[232px] absolute top-0 left-[2%]"
-        />
-        <img
-          src="/assets/images/bonheur-cuisine.png"
-          className="w-[232px] absolute bottom-[5%] -left-[2%]"
-        />
-
-        <img
-          src="/assets/images/bonheur-kebab.png"
-          className="w-[187px] absolute top-[9%] rotate-10 left-[30%]"
-        />
-
-        <img
-          src="/assets/images/bonheur-kebab.png"
-          className="w-[257px] absolute bottom-[5%] -rotate-7 right-[4%]"
-        />
-      </div>
-
-      <div className="block md:hidden">
-        <img
-          src="/assets/images/ouvert.png"
-          className="w-[100px] absolute -top-[2%] left-[0%]"
-        />
-
-        <img
-          src="/assets/images/bonheur-kebab.png"
-          className="w-[100px] absolute bottom-[0%] -rotate-7 right-[4%]"
-        />
-      </div>
-    </div>
-  );
-};
-
-export default Products;
+}
